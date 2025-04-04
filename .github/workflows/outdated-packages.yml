@@ -43,7 +43,7 @@ jobs:
 
       - name: Update package.json
         if: steps.check.outputs.outdated == 'true'
-        run: pnpm exec ncu --target minor -u
+        run: pnpm exec ncu --target minor -u -ws
 
       - name: Install updated dependencies
         if: steps.check.outputs.outdated == 'true'
