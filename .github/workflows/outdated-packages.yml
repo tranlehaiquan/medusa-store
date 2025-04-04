@@ -1,0 +1,58 @@
+name: Check Outdated Packages
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # Runs at 00:00 every Monday
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  check-outdated:
+    name: Check Outdated Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Check outdated packages
+        id: outdated
+        run: |
+          echo "## Outdated Packages Report" > outdated_report.md
+          echo "\`\`\`" >> outdated_report.md
+          pnpm outdated -r >> outdated_report.md || true
+          echo "\`\`\`" >> outdated_report.md
+
+      - name: Create or Update Issue
+        uses: peter-evans/create-issue-action@v4
+        with:
+          title: 📦 Weekly Outdated Packages Report
+          body-file: outdated_report.md
+          labels: dependencies
+          assignees: ${{ github.repository_owner }}
+          token: ${{ secrets.GITHUB_TOKEN }}

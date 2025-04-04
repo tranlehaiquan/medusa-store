@@ -1,3 +1,9 @@
 packages:
-  - "apps/*"
-  - "integration-tests"
+  - apps/*
+  - integration-tests
+onlyBuiltDependencies:
+  - '@medusajs/telemetry'
+  - '@swc/core'
+  - esbuild
+  - msgpackr-extract
+  - sharp
