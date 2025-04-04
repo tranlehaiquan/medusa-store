@@ -1,56 +1,57 @@
-name: Check Outdated Packages
+name: Check and Update NPM Packages
 
 on:
   schedule:
-    - cron: "0 0 * * 1" # Runs at 00:00 every Monday
-  workflow_dispatch: # Allows manual triggering
+    # Runs at 00:00 every Monday
+    - cron: "0 0 * * 1"
+  workflow_dispatch: # Allow manual triggering
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  check-outdated:
-    name: Check Outdated Dependencies
+  update-dependencies:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          node-version: "22"
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install
 
-      - name: Check outdated packages
-        id: outdated
+      - name: Install npm-check-updates
+        run: pnpm add -g npm-check-updates
+
+      - name: Check for outdated packages
+        id: check
         run: |
-          echo "## Outdated Packages Report" > outdated_report.md
-          echo "\`\`\`" >> outdated_report.md
-          pnpm outdated -r >> outdated_report.md || true
-          echo "\`\`\`" >> outdated_report.md
+          if pnpm exec ncu --target minor | grep -q "All dependencies match the latest package versions"; then
+            echo "outdated=false" >> $GITHUB_OUTPUT
+          else
+            echo "outdated=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update package.json
+        if: steps.check.outputs.outdated == 'true'
+        run: pnpm exec ncu --target minor -u
+
+      - name: Install updated dependencies
+        if: steps.check.outputs.outdated == 'true'
+        run: pnpm install --no-frozen-lockfile
 
       - name: Create Pull Request
         if: steps.check.outputs.outdated == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: update pnpm dependencies"
