@@ -48,11 +48,17 @@ jobs:
           pnpm outdated -r >> outdated_report.md || true
           echo "\`\`\`" >> outdated_report.md
 
-      - name: Create or Update Issue
-        uses: peter-evans/create-issue-action@v4
+      - name: Create Pull Request
+        if: steps.check.outputs.outdated == 'true'
+        uses: peter-evans/create-pull-request@v7
         with:
-          title: 📦 Weekly Outdated Packages Report
-          body-file: outdated_report.md
-          labels: dependencies
-          assignees: ${{ github.repository_owner }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update pnpm dependencies"
+          title: "Weekly Package Update"
+          body: |
+            This PR updates outdated packages to their latest versions.
+
+            Updates performed automatically by the Weekly Package Update workflow.
+          branch: package-updates-${{ github.run_id }}
+          delete-branch: true
+          labels: dependencies, automation
